@@ -36,6 +36,7 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -58,7 +59,7 @@ import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "MainActivity";
+    private static final String TAG = "mytag";
 
     public static final String ANONYMOUS = "anonymous";
     public static final int DEFAULT_MSG_LENGTH_LIMIT = 1000;
@@ -191,6 +192,7 @@ public class MainActivity extends AppCompatActivity {
         Map<String, Object> defaultConfigMap = new HashMap<>();
         defaultConfigMap.put(FRIENDLY_MSG_LENGTH_KEY, DEFAULT_MSG_LENGTH_LIMIT);
         mFirebaseRemoteConfig.setDefaults(defaultConfigMap);
+        fetchConfig();
 
     }
 
@@ -300,5 +302,39 @@ public class MainActivity extends AppCompatActivity {
             };
             mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
         }
+    }
+
+    public void fetchConfig(){
+        long cacheExpiration = 3600;
+        if(mFirebaseRemoteConfig.getInfo().getConfigSettings().isDeveloperModeEnabled()){
+            cacheExpiration = 0;
+        }
+        mFirebaseRemoteConfig.fetch(cacheExpiration)
+            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                @Override
+                public void onSuccess(Void aVoid) {
+                    mFirebaseRemoteConfig.activateFetched();
+                    applyRetrievedLengthLimit();
+                    Log.d(TAG, "onSuccess: ");
+                }
+            })
+            .addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    Log.d(TAG, "Error fetching config", e);
+                    applyRetrievedLengthLimit();
+                }
+            });
+
+    }
+
+    /**
+     * Apply retrieved length limit to edit text field. This result may be fresh from the server or it may be from
+     * cached values.
+     */
+    private void applyRetrievedLengthLimit(){
+        Long friendly_msg_length = mFirebaseRemoteConfig.getLong(FRIENDLY_MSG_LENGTH_KEY);
+        mMessageEditText.setFilters(new InputFilter[]{new InputFilter.LengthFilter(friendly_msg_length.intValue())});
+        Log.d(TAG, FRIENDLY_MSG_LENGTH_KEY + " = " + friendly_msg_length);
     }
 }
